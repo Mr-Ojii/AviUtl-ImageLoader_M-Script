@@ -1,0 +1,27 @@
+--file:
+--track0:X,0,8196,0,1
+--track1:Y,0,8196,0,1
+--track2:Scale,1,800,100,0.01
+--track3:Method,0,1,0,1
+
+if file ~= nil then
+    local image_loader_m = require("ImageLoader_M")
+    local filename = file
+    local max_w, max_h = obj.getinfo("image_max")
+    local x = obj.track0
+    local y = obj.track1
+    local scale = obj.track2 / 100.0
+    local scaling_method = obj.track3
+    local buffer_width, buffer_height = image_loader_m.get_image_size(filename, scale, max_w, max_h)
+
+    obj.setfont("MS UI Gothic", obj.track2)
+    if (buffer_width == -1 or buffer_height == -1) then
+        obj.load("text", "Failed to load the image.")
+    else
+        obj.setoption("drawtarget", "tempbuffer", buffer_width, buffer_height)
+        obj.copybuffer("obj", "tmp")
+        local data, w, h = obj.getpixeldata("work")
+        image_loader_m.load_image(data, filename, x, y, scale, w, h, scaling_method)
+        obj.putpixeldata(data)
+    end
+end
