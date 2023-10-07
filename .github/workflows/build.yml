@@ -22,5 +22,5 @@ jobs:
     - name: Build ImageLoader_M
       run: |
         cd ${{ github.workspace }}
-        cmake -S dll_src -B dll_src/build -DLUA51_INCLUDE_DIR=${{ github.workspace }}/.lua/include -DLUA51_LIBRARY_DIR=${{ github.workspace }}/.lua/lib
+        cmake -S dll_src -B dll_src/build -DCMAKE_GENERATOR_PLATFORM=Win32 -DLUA51_INCLUDE_DIR=${{ github.workspace }}/.lua/include -DLUA51_LIBRARY_DIR=${{ github.workspace }}/.lua/lib
         cmake --build dll_src/build --config Release
