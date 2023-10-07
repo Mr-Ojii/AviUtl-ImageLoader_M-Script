@@ -22,5 +22,5 @@ jobs:
     - name: Build ImageLoader_M
       run: |
         cd ${{ github.workspace }}
-        cmake -S dll_src -B build -DLUA51_INCLUDE_DIR=./.lua/include -DLUA51_LIBRARY_DIR=./.lua/lib
+        cmake -S dll_src -B dll_src/build -DLUA51_INCLUDE_DIR=./.lua/include -DLUA51_LIBRARY_DIR=./.lua/lib
         cmake --build dll_src/build --config Release
