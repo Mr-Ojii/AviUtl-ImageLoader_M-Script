@@ -1,0 +1,26 @@
+name: Build
+
+on:
+  push:
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x86
+        
+    - uses: leafo/gh-actions-lua@v10
+      with:
+        luaVersion: 5.1.5
+
+    - name: Build ImageLoader_M
+      run: |
+        cd ${{ github.workspace }}
+        cmake -S dll_src -B build -DLUA51_INCLUDE_DIR=./.lua/include -DLUA51_LIBRARY_DIR=./.lua/lib
+        cmake --build dll_src/build --config Release
