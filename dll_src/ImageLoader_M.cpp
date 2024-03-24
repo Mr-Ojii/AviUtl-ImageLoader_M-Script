@@ -1,4 +1,4 @@
-﻿#include <map>
+﻿#include <unordered_map>
 #include <string>
 #include <cmath>
 #include <memory>
@@ -74,7 +74,7 @@ int load_image(lua_State* L);
 int get_image_size(lua_State* L);
 
 
-static std::map<std::string, ImageData> imagelist;
+static std::unordered_map<std::string, ImageData> imagelist;
 
 inline std::optional<std::wstring> string_convert_A2W(std::string_view str) {
     auto size = MultiByteToWideChar(CP_ACP, 0, str.data(), str.size(), nullptr, 0);
