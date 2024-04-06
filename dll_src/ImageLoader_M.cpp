@@ -229,9 +229,18 @@ int get_image_size(lua_State* L) {
     return 2;
 }
 
+int delete_cache(lua_State* L) {
+    const char* file = lua_tostring(L, 1);
+    std::string_view filename(file);
+
+    std::erase_if(imagelist, [filename](const auto& elm) { return elm.first == filename; });
+    return 0;
+}
+
 static luaL_Reg functions[] = {
     { "load_image", load_image },
     { "get_image_size", get_image_size },
+    { "delete_cache", delete_cache },
     { nullptr, nullptr }
 };
 

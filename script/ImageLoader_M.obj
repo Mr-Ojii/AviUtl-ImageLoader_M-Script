@@ -3,6 +3,7 @@
 --track1:Y,0,8196,0,1
 --track2:Scale,1,800,100,0.01
 --track3:Method,0,1,0,1
+--check0:DelCache,0
 
 if file ~= nil then
     local image_loader_m = require("ImageLoader_M")
@@ -12,6 +13,12 @@ if file ~= nil then
     local y = obj.track1
     local scale = obj.track2 / 100.0
     local scaling_method = obj.track3
+    local del_cache = (obj.check0 or 0) ~= 0
+    
+    if del_cache then
+        image_loader_m.delete_cache(filename)
+    end
+
     local buffer_width, buffer_height = image_loader_m.get_image_size(filename, scale, max_w, max_h)
 
     obj.setfont("MS UI Gothic", obj.track2)
