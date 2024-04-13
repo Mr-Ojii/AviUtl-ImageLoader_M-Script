@@ -1,9 +1,11 @@
 ﻿#include <unordered_map>
 #include <string>
+#include <string_view>
 #include <cmath>
 #include <memory>
 #include <optional>
 #include <algorithm>
+#include <filesystem>
 
 #include <Windows.h>
 #include <gdiplus.h>
@@ -63,6 +65,55 @@ struct MappedPixelData {
     }
 };
 
+struct PictureInfo {
+    long left, top;
+    long width, height;
+    WORD wXDensity;
+    WORD wYDensity;
+    short nColorDepth;
+    HLOCAL hInfo;
+};
+
+typedef int (__stdcall *SUSIE_PROGRESS)(int nNum, int nDenom, LONG_PTR lData);
+typedef int (__stdcall *SUSIE_GetPluginInfo)(int infono, LPSTR buf, int buflen);
+typedef int (__stdcall *SUSIE_IsSupported)(LPCSTR filename, const void *dw);
+typedef int (__stdcall *SUSIE_GetPictureInfo)(LPCSTR buf, LONG_PTR len, unsigned int flag, PictureInfo *lpInfo);
+typedef int (__stdcall *SUSIE_GetPicture)(LPCSTR buf, LONG_PTR len, unsigned int flag, HLOCAL *pHBInfo, HLOCAL *pHBm, SUSIE_PROGRESS lpPrgressCallback, LONG_PTR lData);
+
+struct SusiePlugin {
+    HMODULE hModule = nullptr;
+    SUSIE_GetPluginInfo GetPluginInfo = nullptr;
+    SUSIE_IsSupported IsSupported = nullptr;
+    SUSIE_GetPictureInfo GetPictureInfo = nullptr;
+    SUSIE_GetPicture GetPicture = nullptr;
+
+    SusiePlugin(const char* path) {
+        hModule = LoadLibrary(path);
+        GetPluginInfo  = reinterpret_cast<SUSIE_GetPluginInfo>(GetProcAddress(hModule, "GetPluginInfo"));
+        if (GetPluginInfo == nullptr)
+            return;
+
+        char buf[5] = { 0 };
+        if (GetPluginInfo(0, buf, sizeof(buf)) == 0) {
+            GetPluginInfo = nullptr;
+            return;
+        }
+        if (buf[0] != '0' || buf[1] != '0' || buf[2] != 'I' || buf[3] != 'N') {
+            GetPluginInfo = nullptr;
+            return;
+        }
+
+        IsSupported    = reinterpret_cast<SUSIE_IsSupported>(GetProcAddress(hModule, "IsSupported"));
+        GetPictureInfo = reinterpret_cast<SUSIE_GetPictureInfo>(GetProcAddress(hModule, "GetPictureInfo"));
+        GetPicture     = reinterpret_cast<SUSIE_GetPicture>(GetProcAddress(hModule, "GetPicture"));
+
+
+    }
+    ~SusiePlugin() {
+        FreeLibrary(hModule);
+    }
+};
+
 enum resizing_methods {
     NEAREST_NEIGHBOR = 0,
     BILINEAR
@@ -75,6 +126,7 @@ int get_image_size(lua_State* L);
 
 
 static std::unordered_map<std::string, ImageData> imagelist;
+static std::vector<SusiePlugin> susielist;
 
 inline std::optional<std::wstring> string_convert_A2W(std::string_view str) {
     auto size = MultiByteToWideChar(CP_ACP, 0, str.data(), str.size(), nullptr, 0);
@@ -249,22 +301,46 @@ EXTERN_C __declspec(dllexport) int luaopen_ImageLoader_M(lua_State* L) {
     return 1;
 }
 
-
 static Gdiplus::GdiplusStartupInput input;
 static ULONG_PTR token;
 
 BOOL WINAPI DllMain(HINSTANCE hinstDll, DWORD dwReason, LPVOID lpReserved)
 {
     switch (dwReason) {
-
-    case DLL_PROCESS_ATTACH:
-        Gdiplus::GdiplusStartup(&token, &input, NULL);
-        break;
-
-    case DLL_PROCESS_DETACH:
-        imagelist.clear();
-        Gdiplus::GdiplusShutdown(token);
-        break;
+        case DLL_PROCESS_ATTACH:
+        {
+            Gdiplus::GdiplusStartup(&token, &input, NULL);
+            HMODULE exedit = GetModuleHandle("exedit.auf");
+            // exeditがnullptrでもホストのディレクトリになるのでよし
+            // まぁ、スクリプト読んでるならexedit.auf入ってるでしょ
+            char exedit_dir[MAX_PATH * 2] = { 0 };
+            if( GetModuleFileName(exedit, exedit_dir, MAX_PATH * 2) )
+            {
+                char* p = exedit_dir;
+                while(*p != '\0')
+                        p++;
+                while(*p != '\\')
+                        p--;
+                p++;
+                *p = '\0';
+                
+                for (const auto& x : std::filesystem::directory_iterator(exedit_dir))
+                {
+                    if (x.path().string().ends_with(".spi"))
+                    {
+                        susielist.emplace_back(x.path().string().c_str());
+                    }
+                }
+            }
+            break;
+        }
+        case DLL_PROCESS_DETACH:
+        {
+            imagelist.clear();
+            susielist.clear();
+            Gdiplus::GdiplusShutdown(token);
+            break;
+        }
     }
 
     return TRUE;
