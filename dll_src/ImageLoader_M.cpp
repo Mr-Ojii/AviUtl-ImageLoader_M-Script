@@ -106,8 +106,6 @@ struct SusiePlugin {
         IsSupported    = reinterpret_cast<SUSIE_IsSupported>(GetProcAddress(hModule, "IsSupported"));
         GetPictureInfo = reinterpret_cast<SUSIE_GetPictureInfo>(GetProcAddress(hModule, "GetPictureInfo"));
         GetPicture     = reinterpret_cast<SUSIE_GetPicture>(GetProcAddress(hModule, "GetPicture"));
-
-
     }
     ~SusiePlugin() {
         FreeLibrary(hModule);
@@ -136,29 +134,28 @@ inline std::optional<std::wstring> string_convert_A2W(std::string_view str) {
     return ret;
 }
 
-ImageData* get_image_data(std::string_view filename) {
-    if (auto itr = std::find_if(imagelist.begin(), imagelist.end(), [filename](const auto& elm) { return elm.first == filename; }); itr != imagelist.end())
-        return &itr->second;
-
+std::optional<ImageData> get_image_data_gdiplus(std::string_view filename) {
     auto filenamew = string_convert_A2W(filename);
-    if (!filenamew.has_value())return nullptr;
+    if (!filenamew.has_value())
+        return std::nullopt;
 
     std::unique_ptr<Gdiplus::Bitmap> image(Gdiplus::Bitmap::FromFile(filenamew->c_str()));
 
+
     if (!image)
-        return nullptr;
+        return std::nullopt;
 
     ImageData data(image->GetWidth(), image->GetHeight());
 
     if (!data.is_valid())
-        return nullptr;
+        return std::nullopt;
     
     const int bytes = data.get_bytes();
 
     MappedPixelData mapped_pixels(data);
 
     if (!mapped_pixels.pixels)
-        return nullptr;
+        return std::nullopt;
     
 
     Gdiplus::Rect rect(0, 0, data.width, data.height);
@@ -167,9 +164,36 @@ ImageData* get_image_data(std::string_view filename) {
     memcpy(mapped_pixels.pixels, reinterpret_cast<byte*>(bmpData.Scan0), bytes);
     image->UnlockBits(&bmpData);
 
-    auto [emplaced_itr, emplaced] = imagelist.try_emplace(std::string(filename), std::move(data));
+    std::optional<ImageData> dt(std::move(data));
 
-    return &emplaced_itr->second;
+    return dt;
+}
+
+typedef std::optional<ImageData> (*GetImage_f)(std::string_view filename);
+
+static GetImage_f get_image[] = {
+    get_image_data_gdiplus,
+    nullptr,
+};
+
+ImageData* get_image_data(std::string_view filename) {
+    if (auto itr = std::find_if(imagelist.begin(), imagelist.end(), [filename](const auto& elm) { return elm.first == filename; }); itr != imagelist.end())
+        return &itr->second;
+
+    int i = 0;
+
+    while (get_image[i] != nullptr)
+    {
+        auto d = get_image[i](filename);
+        if (d.has_value())
+        {
+            auto [emplaced_itr, emplaced] = imagelist.try_emplace(std::string(filename), std::move(d.value()));
+            return &emplaced_itr->second;
+        }
+        i++;
+    }
+
+    return nullptr;
 }
 
 int load_image(lua_State* L) {
