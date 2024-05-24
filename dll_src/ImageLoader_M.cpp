@@ -80,9 +80,15 @@ typedef int (__stdcall *SUSIE_IsSupported)(LPCSTR filename, const void *dw);
 typedef int (__stdcall *SUSIE_GetPictureInfo)(LPCSTR buf, LONG_PTR len, unsigned int flag, PictureInfo *lpInfo);
 typedef int (__stdcall *SUSIE_GetPicture)(LPCSTR buf, LONG_PTR len, unsigned int flag, HLOCAL *pHBInfo, HLOCAL *pHBm, SUSIE_PROGRESS lpPrgressCallback, LONG_PTR lData);
 
+int __stdcall dummy_progress(int nNum, int nDenom, LONG_PTR lData) {
+    return 0;
+}
+
 struct SusiePlugin {
+private:
     HMODULE hModule = nullptr;
     SUSIE_GetPluginInfo GetPluginInfo = nullptr;
+public:
     SUSIE_IsSupported IsSupported = nullptr;
     SUSIE_GetPictureInfo GetPictureInfo = nullptr;
     SUSIE_GetPicture GetPicture = nullptr;
@@ -93,12 +99,17 @@ struct SusiePlugin {
         if (GetPluginInfo == nullptr)
             return;
 
-        char buf[5] = { 0 };
+        char buf[256] = { 0 };
         if (GetPluginInfo(0, buf, sizeof(buf)) == 0) {
             GetPluginInfo = nullptr;
             return;
         }
         if (buf[0] != '0' || buf[1] != '0' || buf[2] != 'I' || buf[3] != 'N') {
+            GetPluginInfo = nullptr;
+            return;
+        }
+        memset(buf, 0, sizeof(buf));
+        if (GetPluginInfo(1, buf, sizeof(buf)) == 0) {
             GetPluginInfo = nullptr;
             return;
         }
@@ -169,10 +180,64 @@ std::optional<ImageData> get_image_data_gdiplus(std::string_view filename) {
     return dt;
 }
 
+std::optional<ImageData> get_image_data_susie(std::string_view filename) {
+    std::string file(filename);
+
+    for (auto& susie : susielist) {
+        {
+            uint8_t buf[4096] = {0};
+
+            FILE* fp = fopen(file.c_str(), "rb");
+            fread(buf, 2048, 1, fp);
+            fclose(fp);
+            if (susie.IsSupported(file.c_str(), buf) == 0)
+                continue;
+        }
+
+        HLOCAL pHBInfo;
+        HLOCAL pHBm;
+        if (susie.GetPicture(file.c_str(), 0, 0, &pHBInfo, &pHBm, dummy_progress, NULL) != 0)
+            continue;
+
+        BITMAPINFO* pBMI = reinterpret_cast<BITMAPINFO*>(LocalLock(pHBInfo));
+
+        if (pBMI->bmiHeader.biBitCount == 32) {
+            ImageData data(pBMI->bmiHeader.biWidth, pBMI->bmiHeader.biHeight);
+
+            MappedPixelData mapped_pixels(data);
+
+            if (!mapped_pixels.pixels)
+                return std::nullopt;
+
+            void* pHB = reinterpret_cast<void*>(LocalLock(pHBm));
+
+            for (int i = 0; i < data.height; i++) {
+                memcpy(mapped_pixels.pixels + (data.width * i), reinterpret_cast<void*>((reinterpret_cast<byte*>(pHB) + data.get_bytes() - data.width * 4 * (i + 1))), data.width * 4);
+            }
+
+            LocalUnlock(pHBm);
+            LocalUnlock(pHBInfo);
+            LocalFree(pHBInfo);
+            LocalFree(pHBm);
+            
+            std::optional<ImageData> dt(std::move(data));
+
+            return dt;
+        }
+
+        LocalUnlock(pHBInfo);
+        LocalFree(pHBInfo);
+        LocalFree(pHBm);
+    }
+
+    return std::nullopt;
+}
+
 typedef std::optional<ImageData> (*GetImage_f)(std::string_view filename);
 
 static GetImage_f get_image[] = {
     get_image_data_gdiplus,
+    get_image_data_susie,
     nullptr,
 };
 
