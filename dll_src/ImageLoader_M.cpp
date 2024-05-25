@@ -196,8 +196,13 @@ std::optional<ImageData> get_image_data_susie(std::string_view filename) {
 
         HLOCAL pHBInfo;
         HLOCAL pHBm;
-        if (susie.GetPicture(file.c_str(), 0, 0, &pHBInfo, &pHBm, dummy_progress, NULL) != 0)
+        if (susie.GetPicture(file.c_str(), 0, 0, &pHBInfo, &pHBm, dummy_progress, NULL) != 0) {
+            if (pHBInfo)
+                LocalFree(pHBInfo);
+            if (pHBm)
+                LocalFree(pHBm);
             continue;
+        }
 
         BITMAPINFO* pBMI = reinterpret_cast<BITMAPINFO*>(LocalLock(pHBInfo));
 
