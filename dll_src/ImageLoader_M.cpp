@@ -206,7 +206,7 @@ std::optional<ImageData> get_image_data_susie(std::string_view filename) {
 
         BITMAPINFO* pBMI = reinterpret_cast<BITMAPINFO*>(LocalLock(pHBInfo));
 
-        if (pBMI->bmiHeader.biBitCount == 32) {
+        if (pBMI->bmiHeader.biCompression == BI_RGB && pBMI->bmiHeader.biBitCount == 32) {
             ImageData data(pBMI->bmiHeader.biWidth, pBMI->bmiHeader.biHeight);
 
             MappedPixelData mapped_pixels(data);
