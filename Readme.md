@@ -7,8 +7,9 @@ AviUtlで最大画像サイズを超える画像のロードを行うスクリ�
 
 ## 読み込み可能な画像形式
 + GDI+で読み込み可能な画像形式
++ exedit.aufと同一ディレクトリ内のSusie-Pluginにより、非圧縮RGBAで展開される画像
 
-[ここ](https://docs.microsoft.com/ja-jp/windows/win32/gdiplus/-gdiplus-types-of-bitmaps-about#graphics-file-formats)などを参照してください。
+GDI+で読み込み可能な画像形式については[こちら](https://docs.microsoft.com/ja-jp/windows/win32/gdiplus/-gdiplus-types-of-bitmaps-about#graphics-file-formats)などを参照してください。
 
 ## パラメータ説明
 ### X
