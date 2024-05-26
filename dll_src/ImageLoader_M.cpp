@@ -65,6 +65,22 @@ struct MappedPixelData {
     }
 };
 
+struct SusiePicture {
+    HLOCAL pHBInfo;
+    HLOCAL pHBm;
+
+    SusiePicture() {
+        pHBInfo = NULL;
+        pHBm = NULL;
+    }
+    ~SusiePicture() {
+        if (pHBInfo)
+            LocalFree(pHBInfo);
+        if (pHBm)
+            LocalFree(pHBm);
+    }
+};
+
 struct PictureInfo {
     long left, top;
     long width, height;
@@ -160,14 +176,13 @@ std::optional<ImageData> get_image_data_gdiplus(std::string_view filename) {
 
     if (!data.is_valid())
         return std::nullopt;
-    
+
     const int bytes = data.get_bytes();
 
     MappedPixelData mapped_pixels(data);
 
     if (!mapped_pixels.pixels)
         return std::nullopt;
-    
 
     Gdiplus::Rect rect(0, 0, data.width, data.height);
     Gdiplus::BitmapData bmpData;
@@ -194,17 +209,12 @@ std::optional<ImageData> get_image_data_susie(std::string_view filename) {
                 continue;
         }
 
-        HLOCAL pHBInfo;
-        HLOCAL pHBm;
-        if (susie.GetPicture(file.c_str(), 0, 0, &pHBInfo, &pHBm, dummy_progress, NULL) != 0) {
-            if (pHBInfo)
-                LocalFree(pHBInfo);
-            if (pHBm)
-                LocalFree(pHBm);
-            continue;
-        }
 
-        BITMAPINFO* pBMI = reinterpret_cast<BITMAPINFO*>(LocalLock(pHBInfo));
+        SusiePicture sp;
+        if (susie.GetPicture(file.c_str(), 0, 0, &sp.pHBInfo, &sp.pHBm, dummy_progress, NULL) != 0)
+            continue;
+
+        BITMAPINFO* pBMI = reinterpret_cast<BITMAPINFO*>(LocalLock(sp.pHBInfo));
 
         if (pBMI->bmiHeader.biCompression == BI_RGB && pBMI->bmiHeader.biBitCount == 32) {
             ImageData data(pBMI->bmiHeader.biWidth, pBMI->bmiHeader.biHeight);
@@ -214,25 +224,21 @@ std::optional<ImageData> get_image_data_susie(std::string_view filename) {
             if (!mapped_pixels.pixels)
                 return std::nullopt;
 
-            void* pHB = reinterpret_cast<void*>(LocalLock(pHBm));
+            void* pHB = reinterpret_cast<void*>(LocalLock(sp.pHBm));
 
             for (int i = 0; i < data.height; i++) {
                 memcpy(mapped_pixels.pixels + (data.width * i), reinterpret_cast<void*>((reinterpret_cast<byte*>(pHB) + data.get_bytes() - data.width * 4 * (i + 1))), data.width * 4);
             }
 
-            LocalUnlock(pHBm);
-            LocalUnlock(pHBInfo);
-            LocalFree(pHBInfo);
-            LocalFree(pHBm);
-            
+            LocalUnlock(sp.pHBm);
+            LocalUnlock(sp.pHBInfo);
+
             std::optional<ImageData> dt(std::move(data));
 
             return dt;
         }
 
-        LocalUnlock(pHBInfo);
-        LocalFree(pHBInfo);
-        LocalFree(pHBm);
+        LocalUnlock(sp.pHBInfo);
     }
 
     return std::nullopt;
@@ -288,7 +294,7 @@ int load_image(lua_State* L) {
     y = (std::max)((std::min)(y, static_cast<int>(data->height - ceil(buffer_h / scale))), 0);
 
     auto bytes = data->get_bytes();
-    
+
     MappedPixelData mapped_pixels(*data);
     if (!mapped_pixels.pixels)
         return 0;
@@ -417,7 +423,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDll, DWORD dwReason, LPVOID lpReserved)
                         p--;
                 p++;
                 *p = '\0';
-                
+
                 for (const auto& x : std::filesystem::directory_iterator(exedit_dir))
                 {
                     if (x.path().string().ends_with(".spi"))
