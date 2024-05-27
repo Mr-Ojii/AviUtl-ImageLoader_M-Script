@@ -207,9 +207,7 @@ std::optional<ImageData> get_image_data_gdiplus(std::string_view filename) {
     memcpy(mapped_pixels.pixels, reinterpret_cast<byte*>(bmpData.Scan0), bytes);
     image->UnlockBits(&bmpData);
 
-    std::optional<ImageData> dt(std::move(data));
-
-    return dt;
+    return std::optional<ImageData>(std::move(data));
 }
 
 std::optional<ImageData> get_image_data_susie(std::string_view filename) {
@@ -245,9 +243,7 @@ std::optional<ImageData> get_image_data_susie(std::string_view filename) {
                 memcpy(mapped_pixels.pixels + (data.width * i), reinterpret_cast<void*>((reinterpret_cast<byte*>(lp.pBm) + data.get_bytes() - data.width * 4 * (i + 1))), data.width * 4);
             }
 
-            std::optional<ImageData> dt(std::move(data));
-
-            return dt;
+            return std::optional<ImageData>(std::move(data));
         }
     }
 
