@@ -203,7 +203,8 @@ std::optional<ImageData> get_image_data_gdiplus(std::string_view filename) {
 
     Gdiplus::Rect rect(0, 0, data.width, data.height);
     Gdiplus::BitmapData bmpData;
-    image->LockBits(&rect, Gdiplus::ImageLockModeRead, PixelFormat32bppARGB, &bmpData);
+    if (image->LockBits(&rect, Gdiplus::ImageLockModeRead, PixelFormat32bppARGB, &bmpData) != Gdiplus::Status::Ok)
+        return std::nullopt;
     memcpy(mapped_pixels.pixels, reinterpret_cast<byte*>(bmpData.Scan0), bytes);
     image->UnlockBits(&bmpData);
 
