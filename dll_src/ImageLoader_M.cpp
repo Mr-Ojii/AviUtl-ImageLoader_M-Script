@@ -81,6 +81,23 @@ struct SusiePicture {
     }
 };
 
+struct LockedPicture {
+public:
+    BITMAPINFO* pBmi = nullptr;
+    void* pBm = nullptr;
+    LockedPicture(const SusiePicture* spin) {
+        sp = spin;
+        pBmi = reinterpret_cast<BITMAPINFO*>(LocalLock(sp->pHBInfo));
+        pBm = LocalLock(sp->pHBm);
+    }
+    ~LockedPicture() {
+        LocalUnlock(sp->pHBInfo);
+        LocalUnlock(sp->pHBm);
+    }
+private:
+    const SusiePicture* sp = nullptr;
+};
+
 struct PictureInfo {
     long left, top;
     long width, height;
@@ -214,31 +231,24 @@ std::optional<ImageData> get_image_data_susie(std::string_view filename) {
         if (susie.GetPicture(file.c_str(), 0, 0, &sp.pHBInfo, &sp.pHBm, dummy_progress, NULL) != 0)
             continue;
 
-        BITMAPINFO* pBMI = reinterpret_cast<BITMAPINFO*>(LocalLock(sp.pHBInfo));
+        LockedPicture lp(&sp);
 
-        if (pBMI->bmiHeader.biCompression == BI_RGB && pBMI->bmiHeader.biBitCount == 32) {
-            ImageData data(pBMI->bmiHeader.biWidth, pBMI->bmiHeader.biHeight);
+        if (lp.pBmi->bmiHeader.biCompression == BI_RGB && lp.pBmi->bmiHeader.biBitCount == 32) {
+            ImageData data(lp.pBmi->bmiHeader.biWidth, lp.pBmi->bmiHeader.biHeight);
 
             MappedPixelData mapped_pixels(data);
 
             if (!mapped_pixels.pixels)
                 return std::nullopt;
 
-            void* pHB = reinterpret_cast<void*>(LocalLock(sp.pHBm));
-
             for (int i = 0; i < data.height; i++) {
-                memcpy(mapped_pixels.pixels + (data.width * i), reinterpret_cast<void*>((reinterpret_cast<byte*>(pHB) + data.get_bytes() - data.width * 4 * (i + 1))), data.width * 4);
+                memcpy(mapped_pixels.pixels + (data.width * i), reinterpret_cast<void*>((reinterpret_cast<byte*>(lp.pBm) + data.get_bytes() - data.width * 4 * (i + 1))), data.width * 4);
             }
-
-            LocalUnlock(sp.pHBm);
-            LocalUnlock(sp.pHBInfo);
 
             std::optional<ImageData> dt(std::move(data));
 
             return dt;
         }
-
-        LocalUnlock(sp.pHBInfo);
     }
 
     return std::nullopt;
