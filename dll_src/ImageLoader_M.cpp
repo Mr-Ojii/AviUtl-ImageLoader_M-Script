@@ -119,15 +119,20 @@ int __stdcall dummy_progress(int nNum, int nDenom, LONG_PTR lData) {
 
 struct SusiePlugin {
 private:
-    HMODULE hModule = nullptr;
-    SUSIE_GetPluginInfo GetPluginInfo = nullptr;
+    HMODULE hModule;
+    SUSIE_GetPluginInfo GetPluginInfo;
+    bool baton;
 public:
-    SUSIE_IsSupported IsSupported = nullptr;
-    SUSIE_GetPictureInfo GetPictureInfo = nullptr;
-    SUSIE_GetPicture GetPicture = nullptr;
+    SUSIE_IsSupported IsSupported;
+    SUSIE_GetPictureInfo GetPictureInfo;
+    SUSIE_GetPicture GetPicture;
 
-    SusiePlugin(const char* path) {
+    SusiePlugin(const char* path) : hModule(nullptr), GetPluginInfo(nullptr), baton(true),
+                                    IsSupported(nullptr), GetPictureInfo(nullptr), GetPicture(nullptr) {
         hModule = LoadLibrary(path);
+        if (hModule == nullptr)
+            return;
+
         GetPluginInfo  = reinterpret_cast<SUSIE_GetPluginInfo>(GetProcAddress(hModule, "GetPluginInfo"));
         if (GetPluginInfo == nullptr)
             return;
@@ -152,8 +157,20 @@ public:
         GetPicture     = reinterpret_cast<SUSIE_GetPicture>(GetProcAddress(hModule, "GetPicture"));
     }
     ~SusiePlugin() {
-        FreeLibrary(hModule);
+        if (baton && hModule)
+            FreeLibrary(hModule);
     }
+    SusiePlugin(SusiePlugin&& r) noexcept {
+        hModule = r.hModule;
+        GetPluginInfo = r.GetPluginInfo;
+        IsSupported = r.IsSupported;
+        GetPictureInfo = r.GetPictureInfo;
+        GetPicture = r.GetPicture;
+        baton = true;
+        r.baton = false;
+    }
+
+    constexpr bool is_valid() const { return this->IsSupported && this->GetPictureInfo && this->GetPicture; }
 };
 
 enum resizing_methods {
@@ -478,7 +495,9 @@ BOOL WINAPI DllMain(HINSTANCE hinstDll, DWORD dwReason, LPVOID lpReserved)
                 {
                     if (x.path().string().ends_with(".spi"))
                     {
-                        susielist.emplace_back(x.path().string().c_str());
+                        SusiePlugin susie(x.path().string().c_str());
+                        if (susie.is_valid())
+                            susielist.push_back(std::move(susie));
                     }
                 }
             }
