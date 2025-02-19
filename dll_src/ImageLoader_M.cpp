@@ -225,14 +225,16 @@ std::optional<ImageData> get_image_data_susie(std::string_view filename) {
                 continue;
         }
 
-
         SusiePicture sp;
         if (susie.GetPicture(file.c_str(), 0, 0, &sp.pHBInfo, &sp.pHBm, dummy_progress, NULL) != 0)
             continue;
 
         LockedPicture lp(&sp);
 
-        if (lp.pBmi->bmiHeader.biCompression == BI_RGB && lp.pBmi->bmiHeader.biBitCount == 32) {
+        if (lp.pBmi->bmiHeader.biCompression == BI_RGB && lp.pBmi->bmiHeader.biBitCount == 32 && lp.pBmi->bmiHeader.biHeight > 0) {
+            // とりあえず、ボトムアップのみそのままコピる
+            // https://learn.microsoft.com/ja-jp/windows/win32/directshow/top-down-vs--bottom-up-dibs
+
             ImageData data(lp.pBmi->bmiHeader.biWidth, lp.pBmi->bmiHeader.biHeight);
 
             MappedPixelData mapped_pixels(data);
@@ -243,6 +245,33 @@ std::optional<ImageData> get_image_data_susie(std::string_view filename) {
             for (int i = 0; i < data.height; i++) {
                 memcpy(mapped_pixels.pixels + (data.width * i), reinterpret_cast<void*>((reinterpret_cast<byte*>(lp.pBm) + data.get_bytes() - data.width * 4 * (i + 1))), data.width * 4);
             }
+
+            return std::optional<ImageData>(std::move(data));
+        } else {
+            // SusiePictureをスコープに入れたままGdiplus::Bitmapを使用しなければ、エラーが発生する。
+            std::unique_ptr<Gdiplus::Bitmap> image = std::unique_ptr<Gdiplus::Bitmap>(Gdiplus::Bitmap::FromBITMAPINFO(lp.pBmi, lp.pBm));
+            if (!image)
+                continue;
+
+            Gdiplus::BitmapData bmpData;
+            Gdiplus::Rect rect(0, 0, image->GetWidth(), image->GetHeight());
+            if (image->LockBits(&rect, Gdiplus::ImageLockModeRead, PixelFormat32bppARGB, &bmpData) != Gdiplus::Status::Ok)
+                continue;
+
+            ImageData data(image->GetWidth(), image->GetHeight());
+
+            if (!data.is_valid())
+                continue;
+
+            const int bytes = data.get_bytes();
+
+            MappedPixelData mapped_pixels(data);
+
+            if (!mapped_pixels.pixels)
+                return std::nullopt;
+
+            memcpy(mapped_pixels.pixels, reinterpret_cast<byte*>(bmpData.Scan0), bytes);
+            image->UnlockBits(&bmpData);
 
             return std::optional<ImageData>(std::move(data));
         }
@@ -294,8 +323,10 @@ int load_image(lua_State* L) {
 
     const auto data = get_image_data(filename);
 
-    if (!data)
+    if (!data) {
+        fprintf(stderr, "Failed to load image: %s\n", filename);
         return 0;
+    }
 
     x = (std::max)((std::min)(x, static_cast<int>(data->width - ceil(buffer_w / scale))), 0);
     y = (std::max)((std::min)(y, static_cast<int>(data->height - ceil(buffer_h / scale))), 0);
