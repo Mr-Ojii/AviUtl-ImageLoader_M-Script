@@ -2,12 +2,12 @@
 AviUtlで最大画像サイズを超える画像のロードを行うスクリプト
 
 ## 概要
-抹茶鯖のAodaruma氏のプロトタイプをもとに作ってみたものを、ePi氏に添削していただいたものです。  
+抹茶鯖のAodaruma氏のプロトタイプをもとに作ってみたものを、ePi氏に添削していただき、機能追加を行ったものです。  
 内部で4GB制限にかからないような画像のキャッシュを独自に行っています。
 
 ## 読み込み可能な画像形式
 + GDI+で読み込み可能な画像形式
-+ exedit.aufと同一ディレクトリ内のSusie-Pluginにより、非圧縮RGBAで展開される画像
++ exedit.aufと同一ディレクトリ内のSusie-Pluginで読み込み可能な画像形式
 
 GDI+で読み込み可能な画像形式については[こちら](https://docs.microsoft.com/ja-jp/windows/win32/gdiplus/-gdiplus-types-of-bitmaps-about#graphics-file-formats)などを参照してください。
 
