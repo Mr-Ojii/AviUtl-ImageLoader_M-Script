@@ -353,7 +353,7 @@ int load_image(lua_State* L) {
     const auto data = get_image_data(filename);
 
     if (!data) {
-        fprintf(stderr, "Failed to load image: %s\n", filename);
+        fprintf(stderr, "ImageLoader_M: Failed to load image (%s)\n", filename);
         return 0;
     }
 
@@ -498,6 +498,8 @@ BOOL WINAPI DllMain(HINSTANCE hinstDll, DWORD dwReason, LPVOID lpReserved)
                         SusiePlugin susie(x.path().string().c_str());
                         if (susie.is_valid())
                             susielist.push_back(std::move(susie));
+                        else
+                            fprintf(stderr, "ImageLoader_M: Failed to load susie plugin (%s)\n", x.path().string().c_str());
                     }
                 }
             }
