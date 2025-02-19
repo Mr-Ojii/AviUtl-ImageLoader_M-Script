@@ -232,7 +232,7 @@ std::optional<ImageData> get_image_data_susie(std::string_view filename) {
         LockedPicture lp(&sp);
 
         if (lp.pBmi->bmiHeader.biCompression == BI_RGB && lp.pBmi->bmiHeader.biBitCount == 32 && lp.pBmi->bmiHeader.biHeight > 0) {
-            // とりあえず、ボトムアップのみそのままコピる
+            // ボトムアップ
             // https://learn.microsoft.com/ja-jp/windows/win32/directshow/top-down-vs--bottom-up-dibs
 
             ImageData data(lp.pBmi->bmiHeader.biWidth, lp.pBmi->bmiHeader.biHeight);
@@ -245,6 +245,18 @@ std::optional<ImageData> get_image_data_susie(std::string_view filename) {
             for (int i = 0; i < data.height; i++) {
                 memcpy(mapped_pixels.pixels + (data.width * i), reinterpret_cast<void*>((reinterpret_cast<byte*>(lp.pBm) + data.get_bytes() - data.width * 4 * (i + 1))), data.width * 4);
             }
+
+            return std::optional<ImageData>(std::move(data));
+        } else if (lp.pBmi->bmiHeader.biCompression == BI_RGB && lp.pBmi->bmiHeader.biBitCount == 32 && lp.pBmi->bmiHeader.biHeight < 0) {
+            // トップダウン
+            ImageData data(lp.pBmi->bmiHeader.biWidth, -lp.pBmi->bmiHeader.biHeight);
+
+            MappedPixelData mapped_pixels(data);
+
+            if (!mapped_pixels.pixels)
+                return std::nullopt;
+
+            memcpy(mapped_pixels.pixels, lp.pBm, data.get_bytes());
 
             return std::optional<ImageData>(std::move(data));
         } else {
