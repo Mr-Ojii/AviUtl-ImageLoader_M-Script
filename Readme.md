@@ -10,6 +10,9 @@ AviUtlで最大画像サイズを超える画像のロードを行うスクリ�
 2. `P.name`を`ImageLoader_M Dropper`に変更
 3. オリジナル版のライセンス表記をファイル内に記載
 
+※改造版の導入生じた問題をオリジナル版作者に問い合わせないでください。
+
+
 ## 導入方法
 1. `exedit.auf`と同一ディレクトリにある`script`ディレクトリ内、またはそのディレクトリの1階層下に`ImageLoader_M.obj`,`ImageLoader_M.dll`を配置
 2. (任意)`GCMZDrops`ディレクトリを`exedit.auf`が存在するディレクトリに D&D
