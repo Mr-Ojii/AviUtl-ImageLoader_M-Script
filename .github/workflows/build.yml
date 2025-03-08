@@ -45,6 +45,7 @@ jobs:
         cp dll_src/build/Release/ImageLoader_M.dll pub
         cp script/ImageLoader_M.obj pub
         cp Readme.md pub
+        cp LICENSE.txt pub
         cp -r GCMZDrops pub
         cd pub
         7z a ImageLoader_M.zip *
