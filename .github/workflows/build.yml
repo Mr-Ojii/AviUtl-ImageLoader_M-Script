@@ -51,7 +51,7 @@ jobs:
         7z a ImageLoader_M.zip *
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v5
       with:
         name: ImageLoader_M
         path: ${{ github.workspace }}/pub/ImageLoader_M.zip
@@ -67,7 +67,7 @@ jobs:
       with:
         fetch-depth: 0
 
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v6
       with:
         name: ImageLoader_M
         path: artifacts
